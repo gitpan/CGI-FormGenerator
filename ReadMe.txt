@@ -7,8 +7,8 @@ SYNOPSIS
 
 	use HTML::FormMaker;
 	use CGI::SequentialFile;
-	use CGI::WebUserInput;
-	use CGI::WebUserOutput;
+	use CGI::WebUserIO;
+	use HTML::PageMaker;
 	
 	my @questions = (
 		{
@@ -43,8 +43,8 @@ SYNOPSIS
 		},
 	);
 	
-	my $webpage = CGI::WebUserOutput->new();
-	my $query = CGI::WebUserInput->new();
+	my $webpage = HTML::PageMaker->new();
+	my $query = CGI::WebUserIO->new();
 	my $message_file = CGI::SequentialFile->new( "GB_Messages.txt", 1 );
 	my $form = HTML::FormMaker->new();
 	
@@ -102,7 +102,7 @@ SYNOPSIS
 		$weboage->body_append( \@message_html );
 	}
 	
-	$webpage->send_to_user();
+	$query->send_to_user( undef, $webpage->content_as_string() );
 	
 DESCRIPTION
 
@@ -112,6 +112,12 @@ unlimited number of unrelated dynamic web-sites at once.  But they can also
 implement most other types of form generation and processing environments, such 
 as e-mail submission forms, guest books, discussion boards, password forms,
 survey forms, voting forms, database connectivity forms, and more.  
+
+The modules are compatible with the mod_perl environment in addition to the CGI
+environment.  This means that I have tested all of the modules in a production
+mod_perl environment (my web sites) and found that they function properly within
+the demands that I place on them.  Prior to release 0.32 my only test environment
+was CGI.
 
 One way to look at what these modules can be used for is to look at what the
 popular CGI.pm module is used for.  While I used CGI.pm in the past to perform
@@ -163,12 +169,16 @@ Class-ParamParser-1.0.tar.gz:
 	- Class::ParamParser 1.0 is required by:
 		- HTML::TagMaker
 		- HTML::FormMaker
-		- CGI::WebUserOutput (when assembling a final HTML page only)
+		- HTML::PageMaker (when assembling a final HTML page only)
 	
 libwww-perl-5.48.tar.gz:
 	- by Gisle Aas <gisle@aas.no>
 	- HTTP::Headers 1.37 is required by:
-		- CGI::WebUserOutput
+		- CGI::WebUserIO (when outputting http headers to the user)
+		
+Apache
+	- Apache is required by:
+		- CGI::WebUserIO (when running under mod_perl)
 	
 Older versions of modules that I didn't make may work as well, but I haven't
 tried using them so do it at your own risk.
@@ -202,16 +212,16 @@ definition with which it can generate form html, complete with persistant and
 error-checked user input, as well as formatted reports of the user input in html
 or plain text format.
 
+HTML::PageMaker - Perl module that maintains and assembles the components of a 
+new HTML 4 page, with CSS, and also provides search and replace capabilities.
+
 CGI::HashOfArrays - Perl module that implements a hash whose keys can have
 either single or multiple values, and which can process url-encoded data.
 
-CGI::WebUserInput - Perl module that gathers, parses, and manages user input
-data, including query strings, posts, searches, cookies, and shell arguments, 
-as well as providing cleaner access to many environment variables.
-
-CGI::WebUserOutput - Perl module that maintains the components of a new web page,
-including HTTP headers, with which it can assemble and output complete page HTML
-or redirection headers.
+CGI::WebUserIO - Perl module that gathers, parses, and manages user input and
+output data, including HTTP headers, query strings, posts, searches, cookies, and
+shell arguments, as well as providing cleaner access to many environment
+variables, consistantly under both CGI and mod_perl.
 
 CGI::SequentialFile - Perl module that interfaces to a common text file format
 which stores records as named and url-escaped key=value pairs.

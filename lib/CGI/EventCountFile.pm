@@ -19,7 +19,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '1.02';
+$VERSION = '1.03';
 
 ######################################################################
 
@@ -32,6 +32,7 @@ $VERSION = '1.02';
 =head2 Standard Modules
 
 	Fcntl
+	Symbol
 
 =head2 Nonstandard Modules
 
@@ -42,6 +43,7 @@ $VERSION = '1.02';
 ######################################################################
 
 use Fcntl qw(:DEFAULT :flock);
+use Symbol;
 
 ######################################################################
 
@@ -262,7 +264,7 @@ sub initialize {
 	if( ref( $_[0] ) eq 'GLOB' ) {
 		$self->{$KEY_FILEHANDLE} = shift( @_ );
 	} else {
-		$self->{$KEY_FILEHANDLE} = \*FH;
+		$self->{$KEY_FILEHANDLE} = gensym;
 		$self->{$KEY_FILE_PATH} = shift( @_ );
 		$self->{$KEY_CREAT_NNX} = shift( @_ );
 		$self->{$KEY_ACC_PERMS} = shift( @_ );

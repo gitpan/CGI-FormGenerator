@@ -1,14 +1,13 @@
 =head1 NAME
 
-CGI::WebUserOutput - Perl module that maintains the components of a new web page,
-including HTTP headers, with which it can assemble and output complete page HTML
-or redirection headers.
+HTML::PageMaker - Perl module that maintains and assembles the components of a 
+new HTML 4 page, with CSS, and also provides search and replace capabilities.
 
 =cut
 
 ######################################################################
 
-package CGI::WebUserOutput;
+package HTML::PageMaker;
 require 5.004;
 
 # Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. This module is
@@ -19,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.91';
+$VERSION = '1.0';
 
 ######################################################################
 
@@ -31,25 +30,17 @@ $VERSION = '0.91';
 
 =head2 Standard Modules
 
-	HTTP::Headers 1.36 (earlier versions may work, but not tested)
+	I<none>
 
 =head2 Nonstandard Modules
 
-	HTML::TagMaker
-
-=cut
-
-######################################################################
-
-use HTTP::Headers;
-
-######################################################################
+	HTML::TagMaker  # required in content_as_string() method only
 
 =head1 SYNOPSIS
 
-	use CGI::WebUserOutput;
+	use HTML::PageMaker;
 
-	my $webpage = CGI::WebUserOutput->new();
+	my $webpage = HTML::PageMaker->new();
 
 	$webpage->title( "What Is To Tell" );
 	$webpage->author( "Mine Own Self" );
@@ -85,7 +76,7 @@ use HTTP::Headers;
 	or <A HREF="__url_two__">here</A> ]</P>
 	__endquote
 
-	$webpage->send_to_user();
+	print STDOUT $webpage->content_as_string();
 	
 =head1 DESCRIPTION
 
@@ -95,17 +86,17 @@ structure is an ordered list of content that would go between the "body" tags in
 the document, and it is easy to either append or prepend content to a page.
 
 Building on that concept, this class can also generate a complete HTML page with
-one method call, attaching the appropriate headers and footers to the content of
-the page.  For more customization, this class also stores a list of content that
-goes in the HTML document's "head" section.  As well, it remembers attributes for
-a page such as "title", "author", various "meta" information, and style sheets 
-(linked or embedded).
+one method call to content_as_string(), attaching the appropriate headers and
+footers to the content of the page.  For more customization, this class also
+stores a list of content that goes in the HTML document's "head" section.  As
+well, it remembers attributes for a page such as "title", "author", various
+"meta" information, and style sheets (linked or embedded).
 
-This class also manages and generates all the HTTP headers that need to be sent
-to the web browser prior to the actual HTML code.  Similarly, this class can
-generate redirection headers when we don't want to display any content ourselves.
- A single send_to_user() call will print to STDOUT everything the browser needs 
-to see at once, whether page or redirect.
+The class HTML::TagMaker is required by content_as_string() to do the actual 
+page assembly, and so the style of HTML formatting produced by the classes are 
+consistant.  In addition, the capabilities of HTML::TagMaker define what kinds 
+of special treatment we can provide for the content of the HTML HEAD section.
+If you do not use this method then HTML::PageMaker requires no other modules.
 
 Additional features include global search-and-replace in the body of multiple
 tokens, which can be defined ahead of time and performed later.  Tokens can be
@@ -117,8 +108,6 @@ Future versions of this class will expand to handle an entire frameset document,
 but that was omitted now for simplicity.
 
 =head1 OUTPUT FROM SYNOPSIS PROGRAM
-
-	Content-Type: text/html
 
 	<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN">
 	<HTML>
@@ -133,9 +122,11 @@ but that was omitted now for simplicity.
 	<BODY><H1>Good Reading</H1>
 	<P>Greetings visitors, you must wonder why I called you here.
 	Well you shall find out soon enough, but not from me.</P>
-	<P>That's right, not from me, not in a million years.</P>
-	<P>[ click <A HREF="two.html">here</A> | 
-	or <A HREF="four.html">here</A> ]</P>
+	<P>Sorry, I have just been informed that we can't help you today,
+	as the knowledge-bringers are not in attendance.  You will
+	have to come back another time.</P>
+	<P>[ click <A HREF="one.html">here</A> | 
+	or <A HREF="three.html">here</A> ]</P>
 
 	</BODY>
 	</HTML>
@@ -145,7 +136,6 @@ but that was omitted now for simplicity.
 ######################################################################
 
 # Names of properties for objects of this class are declared here:
-my $KEY_HTTP_HEADER = 'uo_headers';  # this holds our HTTP::Headers object
 my $KEY_MAIN_BODY = 'uo_main_body';  # array of text -> <BODY>*</BODY>
 my $KEY_MAIN_HEAD = 'uo_main_head';  # array of text -> <HEAD>*</HEAD>
 my $KEY_TITLE     = 'uo_title';      # scalar of document title -> head
@@ -155,7 +145,6 @@ my $KEY_CSS_SRC   = 'uo_css_src';    # array of text -> head
 my $KEY_CSS_CODE  = 'uo_css_code';   # array of text -> head
 my $KEY_BODY_ATTR = 'uo_body_attr';  # hash of attrs -> <BODY *>
 my $KEY_REPLACE   = 'uo_replace';  # array of hashes, find and replace
-my $KEY_REDIRECT_URL = 'uo_redirect_url';  # if def, str is redir header
 
 ######################################################################
 
@@ -170,7 +159,7 @@ B<$object-E<gt>method()> for methods.
 
 =head2 new()
 
-This function creates a new CGI::WebUserOutput object and returns it.  This
+This function creates a new HTML::PageMaker object and returns it.  This
 page is empty by default.
 
 =cut
@@ -198,8 +187,6 @@ page.
 
 sub initialize {
 	my $self = shift( @_ );
-
-	$self->{$KEY_HTTP_HEADER} = HTTP::Headers->new();
 	$self->{$KEY_MAIN_BODY} = [];
 	$self->{$KEY_MAIN_HEAD} = [];
 	$self->{$KEY_TITLE} = undef;
@@ -209,11 +196,6 @@ sub initialize {
 	$self->{$KEY_CSS_CODE} = [];	
 	$self->{$KEY_BODY_ATTR} = {};
 	$self->{$KEY_REPLACE} = [];
-	$self->{$KEY_REDIRECT_URL} = undef;
-
-	$self->{$KEY_HTTP_HEADER}->header( 
-		content_type => 'text/html',
-	);
 }
 
 ######################################################################
@@ -224,7 +206,7 @@ This method initializes a new object to have all of the same properties of the
 current object and returns it.  This new object can be provided in the optional
 argument CLONE (if CLONE is an object of the same class as the current object);
 otherwise, a brand new object of the current class is used.  Only object 
-properties recognized by CGI::WebUserOutpu are set in the clone; other properties 
+properties recognized by HTML::PageMaker are set in the clone; other properties 
 are not changed.
 
 =cut
@@ -235,7 +217,6 @@ sub clone {
 	my ($self, $clone, @args) = @_;
 	ref($clone) eq ref($self) or $clone = bless( {}, ref($self) );
 
-	$clone->{$KEY_HTTP_HEADER} = $self->{$KEY_HTTP_HEADER}->clone();
 	$clone->{$KEY_MAIN_BODY} = [@{$self->{$KEY_MAIN_BODY}}];
 	$clone->{$KEY_MAIN_HEAD} = [@{$self->{$KEY_MAIN_HEAD}}];
 	$clone->{$KEY_TITLE} = $self->{$KEY_TITLE};
@@ -245,25 +226,8 @@ sub clone {
 	$clone->{$KEY_CSS_CODE} = [@{$self->{$KEY_CSS_CODE}}];
 	$clone->{$KEY_BODY_ATTR} = {%{$self->{$KEY_BODY_ATTR}}};
 	$clone->{$KEY_REPLACE} = $self->replacements();  # makes copy
-	$clone->{$KEY_REDIRECT_URL} = $self->{$KEY_REDIRECT_URL};
 
 	return( $clone );
-}
-
-######################################################################
-
-=head2 http_header()
-
-This method is an accessor for the "http header" property of this object, which
-it returns a reference to.  The object is of the HTTP::Headers class.
-
-=cut
-
-######################################################################
-
-sub http_header {
-	my $self = shift( @_ );
-	return( $self->{$KEY_HTTP_HEADER} );  # returns ref to object
 }
 
 ######################################################################
@@ -505,27 +469,6 @@ sub replacements {
 
 ######################################################################
 
-=head2 redirect_url([ VALUE ])
-
-This method is an accessor for the "redirect url" scalar property of this object,
-which it returns.  If VALUE is defined, this property is set to it.  If this
-property is defined, then the to_string() method will return a redirection header
-going to the url rather than an ordinary web page.
-
-=cut
-
-######################################################################
-
-sub redirect_url {
-	my $self = shift( @_ );
-	if( defined( my $new_value = shift( @_ ) ) ) {
-		$self->{$KEY_REDIRECT_URL} = $new_value;
-	}
-	return( $self->{$KEY_REDIRECT_URL} );
-}
-
-######################################################################
-
 =head2 body_append( VALUES )
 
 This method appends new elements to the "body content" list property of this
@@ -660,83 +603,43 @@ sub do_replacements {
 
 ######################################################################
 
-=head2 to_string()
+=head2 content_as_string()
 
-This method returns a scalar containing the complete web page that this object
-describes, that is, it returns the string representation of this object.  It
-includes both the HTTP header and the HTTP body.  The HTTP body is usually the
-formatted HTML document itself, which consists of a prologue tag, a pair of
-"html" tags and everything in between.  If the object represents a different data
-type (not yet supported), then the HTTP body is different.  If the object is a
-redirection header (when "redirect url" property is true) then there is no HTTP
-body at all.
+This method returns a scalar containing the complete HTML page that this object
+describes, that is, it returns the string representation of this object.  This 
+consists of a prologue tag, a pair of "html" tags and everything in between.  
+This method requires HTML::TagMaker to do the actual page assembly, and so the 
+results are consistant with its abilities.
 
 =cut
 
 ######################################################################
 
-sub to_string {
+sub content_as_string {
 	my $self = shift( @_ );
-	my $ret_value;
 
 	$self->do_replacements();
 
-	my $http = $self->{$KEY_HTTP_HEADER};
+	require HTML::TagMaker;
+	my $html = HTML::TagMaker->new();
 
-	if( my $url = $self->{$KEY_REDIRECT_URL} ) {
-		$http->header( 
-			status => '301 Moved',  # used to be "302 Found"
-			uri => $url,
-			location => $url,
-			target => 'external_link_window',
-		);
-		$ret_value = $http->as_string( @_ );
+	my $header = $html->start_html(
+		title => $self->{$KEY_TITLE},
+		author => $self->{$KEY_AUTHOR},
+		meta => $self->{$KEY_META},
+		style => {
+			src => $self->{$KEY_CSS_SRC},
+			code => $self->{$KEY_CSS_CODE},
+		},
+		head => $self->{$KEY_MAIN_HEAD},
+		body => $self->{$KEY_BODY_ATTR},
+	);
 
-	} else {
-		require HTML::TagMaker;
+	my $body = join( '', @{$self->{$KEY_MAIN_BODY}} );
 
-		my $html = HTML::TagMaker->new();
-		
-		my $http_header = $http->as_string( @_ );
-
-		my $header = $html->start_html(
-			title => $self->{$KEY_TITLE},
-			author => $self->{$KEY_AUTHOR},
-			meta => $self->{$KEY_META},
-			style => {
-				src => $self->{$KEY_CSS_SRC},
-				code => $self->{$KEY_CSS_CODE},
-			},
-			head => $self->{$KEY_MAIN_HEAD},
-			body => $self->{$KEY_BODY_ATTR},
-		);
-		
-		my $body = join( '', @{$self->{$KEY_MAIN_BODY}} );
-		
-		my $footer = $html->end_html();
+	my $footer = $html->end_html();
 	
-		$ret_value = $http_header.$header.$body.$footer;
-	}
-		
-	return( $ret_value );
-}
-
-######################################################################
-
-=head2 send_to_user()
-
-This method assembles the complete web page that this object describes and then
-outputs it to the user.  Calling this method is equivalent to calling the
-to_string() method and printing the returned scalar to STDOUT, which is the
-standard method of returning web pages to the user's web browser.
-
-=cut
-
-######################################################################
-
-sub send_to_user {
-	my $self = shift( @_ );
-	print STDOUT $self->to_string();
+	return( $header.$body.$footer );
 }
 
 ######################################################################
@@ -761,6 +664,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1), HTTP::Headers, HTML::TagMaker.
+perl(1), HTML::TagMaker.
 
 =cut

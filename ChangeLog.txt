@@ -1,3 +1,44 @@
+2000-12-26   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.92.
+	
+	* The main purpose of this release is to ensure compatability with 
+	the mod_perl environment in addition to the CGI environment.  This means 
+	that I have tested all of the modules in a production mod_perl environment 
+	(my web sites) and found that they function properly within the demands that 
+	I place on them.  Previously my only test environment was CGI.
+	
+	* The modules CGI::WebUserInput and CGI::WebUserOutput were renamed to 
+	CGI::WebUserIO and HTML::PageMaker respectively, and any functionality in 
+	the second which was not specifically related to making HTML was transferred 
+	to the first.  This includes the redirect_url() and send_to_user() methods.
+	
+	* Updated module HTML::PageMaker to version 1.0 from 0.91.  This module  
+	is feature-complete and has complete POD.  The method to_string() was 
+	renamed to content_as_string().  This class no longer uses HTTP::Headers, 
+	and its use of HTML::TagMaker is restricted to the aforementioned method().
+	
+	* Updated module CGI::WebUserIO to version 0.92 from 0.91.  This module 
+	now requires Apache when running under mod_perl.  It also requires 
+	HTTP::Headers to do any sort of header output, which is normally done.  
+	This module can now be used both to get the user's input data, as well as 
+	to output complete HTTP headers and content to the user.  This works 
+	transparently under CGI and mod_perl.
+	
+	* Updated modules CGI::SequentialFile and CGI::EventCountFile so that they 
+	use the "gensym" function in the Symbol package to generate their 
+	filehandles; previously they used "\*FH", which may be problematic.  Each 
+	of their version numbers were incremented by 0.01.
+	
+	* The list of modules now reads like this:
+		HTML::TagMaker 1.01
+		HTML::FormMaker 1.01
+		HTML::PageMaker 1.0
+		CGI::HashOfArrays 1.02
+		CGI::WebUserIO 0.92
+		CGI::SequentialFile 1.02
+		CGI::EventCountFile 1.03
+
 2000-11-14   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.91.
@@ -8,10 +49,9 @@
 	
 	* All 7 modules in this release are now functionally synchronized in respect 
 	to the methods new(), initialize(), and clone().  Modules that lacked any of 
-	these had them added, and the others received rewrites.  Exceptions are that 
-	HTML::TagMaker and HTML::FormMaker don't have initialize() methods, and the 
-	clone() method in CGI::HashOfArrays can take extra arguments relative to the 
-	others' clone() methods.  Related to these updates, all of the modules 
+	these had them added, and the others received rewrites.  An exception is that 
+	the clone() method in CGI::HashOfArrays can take extra arguments relative to 
+	the others' clone() methods.  Related to these updates, all of the modules 
 	should be easier to subclass than they were before, particular if they are 
 	one of multiple parents.
 	

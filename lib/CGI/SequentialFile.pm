@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '1.01';
+$VERSION = '1.02';
 
 ######################################################################
 
@@ -31,6 +31,7 @@ $VERSION = '1.01';
 =head2 Standard Modules
 
 	Fcntl
+	Symbol
 
 =head2 Nonstandard Modules
 
@@ -41,6 +42,7 @@ $VERSION = '1.01';
 ######################################################################
 
 use Fcntl qw(:DEFAULT :flock);
+use Symbol;
 use CGI::HashOfArrays 1.02;
 
 ######################################################################
@@ -212,7 +214,7 @@ sub initialize {
 	if( ref( $_[0] ) eq 'GLOB' ) {
 		$self->{$KEY_FILEHANDLE} = shift( @_ );
 	} else {
-		$self->{$KEY_FILEHANDLE} = \*FH;
+		$self->{$KEY_FILEHANDLE} = gensym;
 		$self->{$KEY_FILE_PATH} = shift( @_ );
 		$self->{$KEY_CREAT_NNX} = shift( @_ );
 		$self->{$KEY_ACC_PERMS} = shift( @_ );

@@ -1,0 +1,49 @@
+These are some thoughts on what I need to do still.  Order does not indicate
+priority.
+
+* Write test scripts for everything.  Until then you just have to use them as
+they were intended to see if they work.  In many cases, you could run the
+"Synopsis" programs and compare their output to what I have in the POD.
+
+* Write makefiles for everything.  Meanwhile, you'll have to copy the
+old-fashioned way.
+
+* Add features to HTML::FormMaker, including the following:
+  - add field attribute readonly, allowing once-editable field data to share 
+    screen space with still-editable field data.
+  - add field attribute to multiple-answer fields that make the validation check 
+    see if they chose the correct number of answers (eg: pick 3 checkboxes).
+  - add validation checking for selection fields to see that choices submitted 
+    match selection of choices given.
+  - allow individual editing of internally stored field definitions, rather than 
+    requiring that they are all defined at once.
+  - customize validation error messages so they give a better idea what about 
+    the entry was inappropriate (eg: wrong number of selections).
+
+* Fix bug in HTML::FormMaker where providing a Hash ref as a "labels" parameter
+for radio/field groups doesn't work (acts like explicit labels not provided and
+uses values as labels).  In the meantime, using an Array ref for that parameter
+works fine, so I suggest using it instead.
+
+* Make a utility program that utilizes HTML::FormMaker's abilities to let users
+create form definitions for it with a web browser.
+
+* Flesh out POD in HTML::FormMaker so that users don't need to reference CGI.pm
+to know what various field types and their normal parameters are for (they are
+sideways compatible).  The parameters I added are explained, however.
+
+* Complete POD in CGI::WebUserIO; it is missing Description and method 
+descriptions (although their names and params are listed).
+
+* Test cookie-handling abilities of CGI::WebUserIO.
+
+* Explicitely add cookie-storing-handling abilities to CGI::WebUserIO. 
+Meanwhile, you can still use the send_headers_to_user() method with an 
+HTTP::Headers argument that contains your cookies; the cookie value string can 
+be encoded using CGI::HashOfArrays.
+
+* Make more use of the functionality that the Apache::* modules provide when 
+running under mod_perl; this would all go in CGI::WebUserIO.
+
+* Perhaps rename some of the modules.  How many of the CGI::* are actually CGI 
+specific anyway?

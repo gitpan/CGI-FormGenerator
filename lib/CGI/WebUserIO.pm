@@ -1,14 +1,15 @@
 =head1 NAME
 
-CGI::WebUserInput - Perl module that gathers, parses, and manages user input
-data, including query strings, posts, searches, cookies, and shell arguments, 
-as well as providing cleaner access to many environment variables.
+CGI::WebUserIO - Perl module that gathers, parses, and manages user input and
+output data, including HTTP headers, query strings, posts, searches, cookies, and
+shell arguments, as well as providing cleaner access to many environment
+variables, consistantly under both CGI and mod_perl.
 
 =cut
 
 ######################################################################
 
-package CGI::WebUserInput;
+package CGI::WebUserIO;
 require 5.004;
 
 # Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. This module is
@@ -19,7 +20,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.91';
+$VERSION = '0.92';
 
 ######################################################################
 
@@ -31,7 +32,8 @@ $VERSION = '0.91';
 
 =head2 Standard Modules
 
-	I<none>
+	Apache (when running under mod_perl only)
+	HTTP::Headers 1.36 (earlier versions may work, but not tested)
 
 =head2 Nonstandard Modules
 
@@ -47,9 +49,57 @@ use CGI::HashOfArrays;
 
 =head1 SYNOPSIS
 
-I<This POD is coming when I get the time to write it.>
+	use CGI::WebUserIO;
+
+	my $query = CGI::WebUserIO->new();
+
+	if( my $url = $query->user_input_param( "gohere" ) ) {
+		$query->redirect_url( $url );
+		$query->send_to_user();
+		return( 1 );
+	}
+
+	$query->send_headers_to_user();
+
+	$query->send_content_to_user( <<__endquote );
+	<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN"> 
+	<HTML><HEAD>
+	<TITLE>Choose Your Own Adventure</TITLE> 
+	</HEAD><BODY>
+
+	<H1>Choose Your Own Adventure</H1>
+
+	<P>Welcome to a new adventure.  Thanks be to 
+	@{[$query->http_referrer()]} for sending you to us.</P>
+
+	<P>You have brought @{[$query->user_cookie()->keys_count()]} 
+	cookies with you to share.  How nice.</P>
+
+	<FORM METHOD="post" ACTION="@{[$query->self_url()]}">
+
+	<P>Enter a url here that you want to visit: <BR>
+	<INPUT TYPE="text" NAME="gohere" VALUE=""></P>
+
+	<P>Enter an environment variable that you want to view: <BR>
+	<INPUT TYPE="text" NAME="anenv" 
+	VALUE="@{[$query->user_input_param("anenv")]}"></P>
+
+	<P>The last one you chose contained 
+	"@{[$ENV{$query->user_input_param("anenv")}]}".</P>
+
+	<P><INPUT TYPE="submit" NAME="doit" VALUE="Choose"></P>
+
+	</FORM>
+
+	</BODY></HTML> 
+	__endquote
 
 =head1 DESCRIPTION
+
+Perl module that gathers, parses, and manages user input and
+output data, including HTTP headers, query strings, posts, searches, cookies, and
+shell arguments, as well as providing cleaner access to many environment
+variables, consistantly under both CGI and mod_perl.
 
 I<This POD is coming when I get the time to write it.>
 
@@ -66,6 +116,8 @@ I<This POD is coming when I get the time to write it.>
 	new([ USER_INPUT ])
 	initialize([ USER_INPUT ])
 	clone([ CLONE ]) -- POD for this available below
+
+	is_mod_perl()
 
 	user_cookie_str()
 	user_query_str()
@@ -88,8 +140,6 @@ I<This POD is coming when I get the time to write it.>
 	remote_user()
 	user_agent()
 
-	is_mod_perl()
-
 	base_url()
 	self_url()
 	self_post([ LABEL ])
@@ -109,6 +159,14 @@ I<This POD is coming when I get the time to write it.>
 	persistant_user_input_param( KEY[, NEW_VALUES] )
 	persistant_url()
 
+	redirect_url([ NEW_VALUE ]) -- POD for this available below
+	
+	get_http_headers()
+	
+	send_headers_to_user([ HTTP ])
+	send_content_to_user([ CONTENT ])
+	send_to_user([ HTTP[, CONTENT] ])
+	
 	parse_url_encoded_cookies( DO_LC_KEYS, ENCODED_STRS )
 	parse_url_encoded_queries( DO_LC_KEYS, ENCODED_STRS )
 
@@ -137,6 +195,9 @@ my $KEY_PERSIST_QUERY  = 'ui_persist_query';  # which qp persist for session
 	# this is used only when constructing new urls, and it stores just 
 	# the names of user input params whose values we are to return.
 
+# These properties relate to output headers
+my $KEY_REDIRECT_URL = 'uo_redirect_url';  # if def, str is redir header
+
 # Constant values used in this class go here:
 
 my $MAX_CONTENT_LENGTH = 100_000;  # currently limited to 100 kbytes
@@ -155,6 +216,11 @@ sub new {
 
 sub initialize {
 	my ($self, $user_input) = @_;
+
+	if( $self->is_mod_perl() ) {
+		require Apache;
+		$| = 1;
+	}
 	
 	$self->{$KEY_INITIAL_UI} ||= $self->get_initial_user_input();
 	
@@ -167,6 +233,7 @@ sub initialize {
 		$self->user_offline_str() 
 	);
 	$self->{$KEY_PERSIST_QUERY} = {};
+	$self->{$KEY_REDIRECT_URL} = undef;
 	
 	$self->user_input( $user_input );
 }
@@ -179,7 +246,7 @@ This method initializes a new object to have all of the same properties of the
 current object and returns it.  This new object can be provided in the optional
 argument CLONE (if CLONE is an object of the same class as the current object);
 otherwise, a brand new object of the current class is used.  Only object 
-properties recognized by CGI::WebUserInput are set in the clone; other properties 
+properties recognized by CGI::WebUserIO are set in the clone; other properties 
 are not changed.
 
 =cut
@@ -194,8 +261,15 @@ sub clone {
 	$clone->{$KEY_USER_COOKIE} = $self->{$KEY_USER_COOKIE}->clone();
 	$clone->{$KEY_USER_INPUT} = $self->{$KEY_USER_INPUT}->clone();
 	$clone->{$KEY_PERSIST_QUERY} = {%{$self->{$KEY_PERSIST_QUERY}}};
+	$clone->{$KEY_REDIRECT_URL} = $self->{$KEY_REDIRECT_URL};
 	
 	return( $clone );
+}
+
+######################################################################
+
+sub is_mod_perl {
+	return( $ENV{'GATEWAY_INTERFACE'} =~ /^CGI-Perl/ );
 }
 
 ######################################################################
@@ -234,13 +308,6 @@ sub remote_host { $ENV{'REMOTE_HOST'} || $ENV{'REMOTE_ADDR'} ||
 sub remote_user { $ENV{'AUTH_USER'} || $ENV{'LOGON_USER'} || 
 	$ENV{'REMOTE_USER'} || $ENV{'HTTP_FROM'} || $ENV{'REMOTE_IDENT'} }
 sub user_agent { $ENV{'HTTP_USER_AGENT'} }
-
-######################################################################
-
-sub is_mod_perl {
-	return( defined( $ENV{'GATEWAY_INTERFACE'} ) &&
-		$ENV{'GATEWAY_INTERFACE'} =~ /^CGI-Perl/ );
-}
 
 ######################################################################
 
@@ -381,6 +448,79 @@ sub persistant_url {
 
 ######################################################################
 
+=head2 redirect_url([ VALUE ])
+
+This method is an accessor for the "redirect url" scalar property of this object,
+which it returns.  If VALUE is defined, this property is set to it.  If this
+property is defined, then an http redirection header will be returned to the user 
+instead of an ordinary web page.
+
+=cut
+
+######################################################################
+
+sub redirect_url {
+	my $self = shift( @_ );
+	if( defined( my $new_value = shift( @_ ) ) ) {
+		$self->{$KEY_REDIRECT_URL} = $new_value;
+	}
+	return( $self->{$KEY_REDIRECT_URL} );
+}
+
+######################################################################
+
+sub get_http_headers {
+	my $self = shift( @_ );
+
+	require HTTP::Headers;
+	my $http = HTTP::Headers->new();
+
+	if( my $url = $self->{$KEY_REDIRECT_URL} ) {
+		$http->header( 
+			status => '301 Moved',  # used to be "302 Found"
+			uri => $url,
+			location => $url,
+		);
+
+	} else {
+		$http->header( 
+			status => '200 OK',
+			content_type => 'text/html',
+		);
+	}
+
+	return( $http );  # return HTTP headers object
+}
+
+######################################################################
+
+sub send_headers_to_user {
+	my ($self, $http) = @_;
+	ref( $http ) eq 'HTTP::Headers' or $http = $self->get_http_headers();
+
+	if( $self->is_mod_perl() ) {
+		my $req = Apache->request();
+		$http->scan( sub { $req->cgi_header_out( @_ ); } );			
+
+	} else {
+		my $endl = "\015\012";  # cr + lf
+		print STDOUT $http->as_string( $endl ).$endl;
+	}
+}
+
+sub send_content_to_user {
+	my ($self, $content) = @_;
+	print STDOUT $content;
+}
+
+sub send_to_user {
+	my ($self, $http, $content) = @_;
+	$self->send_headers_to_user( $http );
+	$self->send_content_to_user( $content );
+}
+
+######################################################################
+
 sub parse_url_encoded_cookies {
 	my $self = shift( @_ );
 	my $parsed = CGI::HashOfArrays->new( shift( @_ ) );
@@ -412,12 +552,14 @@ sub parse_url_encoded_queries {
 # if the extra data isn't there.
 
 sub get_initial_user_input {
+	my $self = shift( @_ );
 	my %iui = ();
 
 	$iui{$IKEY_COOKIE} = $ENV{'HTTP_COOKIE'} || $ENV{'COOKIE'};
 	
 	if( $ENV{'REQUEST_METHOD'} =~ /^(GET|HEAD|POST)$/ ) {
 		$iui{$IKEY_QUERY} = $ENV{'QUERY_STRING'};
+		$iui{$IKEY_QUERY} ||= $ENV{'REDIRECT_QUERY_STRING'};
 		
 		if( $ENV{'CONTENT_LENGTH'} <= $MAX_CONTENT_LENGTH ) {
 			read( STDIN, $iui{$IKEY_POST}, $ENV{'CONTENT_LENGTH'} );
@@ -426,7 +568,7 @@ sub get_initial_user_input {
 			$iui{$IKEY_OVERSIZE} = $MAX_CONTENT_LENGTH;
 		}
 
-	} elsif( @ARGV ) {
+	} elsif( $ARGV[0] ) {  # allow caller to save $ARGV[1..n] for themselves
 		$iui{$IKEY_OFFLINE} = $ARGV[0];
 
 	} else {
@@ -461,7 +603,7 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1).
+perl(1), mod_perl, CGI::HashOfArrays, HTTP::Headers, Apache.
 
 =cut
 
