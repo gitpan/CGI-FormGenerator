@@ -1,5 +1,12 @@
 2000-12-26   Darren Duncan <perl@DarrenDuncan.net>
 
+	* Release 0.9201.
+	
+	* Removed the ".txt" extensions from my ReadMe files, since they aren't 
+	pulled out by the CPAN documentation system otherwise.
+	
+2000-12-26   Darren Duncan <perl@DarrenDuncan.net>
+
 	* Release 0.92.
 	
 	* The main purpose of this release is to ensure compatability with 
@@ -38,6 +45,8 @@
 		CGI::WebUserIO 0.92
 		CGI::SequentialFile 1.02
 		CGI::EventCountFile 1.03
+
+	* The "Manifest" was reformatted to be more machine friendly.
 
 2000-11-14   Darren Duncan <perl@DarrenDuncan.net>
 

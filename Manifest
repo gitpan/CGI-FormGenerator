@@ -1,7 +1,7 @@
-ChangeLog.txt
-Manifest.txt
-ReadMe.txt
-ToDo.txt
+ChangeLog
+Manifest
+ReadMe
+ToDo
 lib/CGI/EventCountFile.pm
 lib/CGI/HashOfArrays.pm
 lib/CGI/SequentialFile.pm
