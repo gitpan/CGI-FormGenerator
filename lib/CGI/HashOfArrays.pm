@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '1.01';
+$VERSION = '1.02';
 
 ######################################################################
 
@@ -38,7 +38,7 @@ $VERSION = '1.01';
 
 =head1 SYNOPSIS
 
-	use CGI::HashOfArrays 1.01;
+	use CGI::HashOfArrays 1.02;
 
 	my $case_insensitive = 1;
 	my $complementry_set = 1;
@@ -60,21 +60,19 @@ $VERSION = '1.01';
 		print "Field '$key' contains: '".join( "','", @values )."'\n";
 	}
 
+	my @record_list = ();
+
 	open( KEVOEL, "+<guestbook.txt" ) or die "can't open file: $!\n";
 	flock( KEVOEL, 2 );
-	local $/ = undef;
 	seek( KEVOEL, 0, 2 );
-	print KEVOEL "\n=\n".$params->to_url_encoded_string( "\n" );
-	local $\ = undef;
+	$params->to_file( \*KEVOEL );
 	seek( KEVOEL, 0, 0 );
-	my $all_records_str = <KEVOEL>;
+	until( eof( KEVOEL ) ) {
+		push( @record_list, CGI::HashOfArrays->new( 
+			$case_insensitive, \*KEVOEL ) );
+	}
 	flock( KEVOEL, 8 );
 	close( KEVOEL );
-
-	@record_str_list = split( /\n*=?\n/, $records );
-	@record_list = map { 
-		CGI::HashOfArrays->new( $case_insensitive, $_, "\n" )
-		} @record_str_list;
 		
 	foreach my $record (@record_list) {
 		print "\nSubmitted by:".$record->fetch_value( 'name' )."\n";
@@ -95,7 +93,7 @@ many places that such a structure is useful, such as database records whose
 fields may be multi-valued, or when parsing results of an html form that contains
 several fields with the same name.  This class can export a wide variety of
 key/value subsets of its data when only some keys are needed.  In addition, this
-class can parse and create url-encoded strings, such as with http query or cookie 
+class can parse and create url-encoded strings, such as with http query or cookie
 strings, or for encoding binary information in a text file.
 
 While you could do tasks similar to this class by making your own hash with array
@@ -116,7 +114,8 @@ my $KEY_CASE_INSE = 'case_inse';  # are our keys case insensitive?
 =head1 SYNTAX
 
 This class does not export any functions or methods, so you need to call them
-using indirect notation.  This means using B<Class-E<gt>function()> for functions and
+using indirect notation.  This means using B<Class-E<gt>function()> for functions
+and
 B<$object-E<gt>method()> for methods.
 
 All method parameters and results are passed by value (where appropriate) such
@@ -140,22 +139,22 @@ context.  Scalar results are returned as themselves, of course.
 
 =head1 FUNCTIONS AND METHODS
 
-=head2 new([ CASE[, SOURCE[, DELIM[, VALSEP]]] ])
+=head2 new([ CASE[, SOURCE[, *]] ])
 
-This function creates a new CGI::HashOfArrays object and returns it. The
-optional parameter CASE (scalar) specifies whether or not the new object uses
-case-insensitive keys or not; the default value is false. This attribute can not
-be changed later, except by calling the B<initialize()> method.
+This function creates a new CGI::HashOfArrays object and returns it.  
 
-The second optional parameter, SOURCE is used as initial keys and values for this
-object.  If it is a Hash Ref (normal or of arrays), then the store_all() method
-is called to handle it.  If the same parameter is an HoA object, then its keys
-and values are similarly given to store_all().  Otherwise, the method
-from_url_encoded_string() is used.  In the last case only, the third and fourth
-optional arguments, DELIM and VALSEP, would be used in parsing SOURCE.
-
+The first optional parameter CASE (scalar) specifies whether or not the new
+object uses case-insensitive keys or not; the default value is false. This
+attribute can not be changed later, except by calling the B<initialize()> method.
 Case-insensitivity simplifies matching form field names whose case may have been
 changed by the web browser while in transit (I have seen it happen).
+
+The second optional parameter, SOURCE is used as initial keys and values for this
+object.  If it is a Hash Ref (normal or of arrays), then the store_all( SOURCE )
+method is called to handle it.  If the same parameter is an HoA object, then its
+keys and values are similarly given to store_all( SOURCE ).  If SOURCE is a valid
+file handle then from_file( SOURCE, * ) is used.  Otherwise, the method
+from_url_encoded_string( SOURCE, * ) is used.
 
 =cut
 
@@ -163,15 +162,14 @@ changed by the web browser while in transit (I have seen it happen).
 
 sub new {
 	my $class = shift( @_ );
-	my $self = {};
-	bless( $self, ref($class) || $class );
+	my $self = bless( {}, ref($class) || $class );
 	$self->initialize( @_ );
 	return( $self );
 }
 
 ######################################################################
 
-=head2 initialize([ CASE[, SOURCE[, DELIM[, VALSEP]]] ])
+=head2 initialize([ CASE[, SOURCE[, *]] ])
 
 This method is used by B<new()> to set the initial properties of objects that it
 creates.  Calling it yourself will empty the internal hash.  If you provide
@@ -192,6 +190,8 @@ sub initialize {
 		if( ref($initializer) eq 'CGI::HashOfArrays' or 
 				ref($initializer) eq 'HASH' ) {
 			$self->store_all( $initializer );
+		} elsif( ref($initializer) eq 'GLOB' ) {
+			$self->from_file( $initializer, @_ );
 		} else {
 			$self->from_url_encoded_string( $initializer, @_ );
 		}
@@ -200,14 +200,17 @@ sub initialize {
 
 ######################################################################
 
-=head2 clone([ KEYS[, COMPLEMENT] ])
+=head2 clone([ CLONE[, KEYS[, COMPLEMENT]] ])
 
-This method creates a new CGI::HashOfArrays object, which is a duplicate of
-this one in every respect, and returns it.  However, if the optional arguments
-are used, then the clone may not have all the keys that the parent does.  The
-first optional argument, KEYS, is an array ref that specifies a subset of all
-this object's keys that we want returned.  If the second optional boolean
-argument, COMPLEMENT, is true, then the complement of the keys listed in KEYS is
+This method initializes a new object to have all of the same properties of the
+current object and returns it.  This new object can be provided in the optional
+argument CLONE (if CLONE is an object of the same class as the current object);
+otherwise, a brand new object of the current class is used.  Only object
+properties recognized by CGI::HashOfArrays are set in the clone; other properties
+are not changed.  If the optional arguments KEYS and COMPLEMENT are used, then
+the clone may not have all the keys that the parent does.  KEYS is an array ref
+that specifies a subset of all this object's keys that we want returned.  If the
+boolean COMPLEMENT is true, then the complement of the keys listed in KEYS is
 returned instead.
 
 =cut
@@ -215,15 +218,14 @@ returned instead.
 ######################################################################
 
 sub clone {
-	my $self = shift( @_ );
-	my $clone = {};
-	bless( $clone, ref($self) );
-	
+	my ($self, $clone, @args) = @_;
+	ref($clone) eq ref($self) or $clone = bless( {}, ref($self) );
+
 	my $rh_main_hash = $self->{$KEY_MAIN_HASH};
 	my %hash_copy = 
 		map { ( $_, [@{$rh_main_hash->{$_}}] ) } keys %{$rh_main_hash};
-	if( $_[0] ) {
-		$self->_reduce_hash_to_subset( \%hash_copy, @_ );
+	if( $args[0] ) {
+		$self->_reduce_hash_to_subset( \%hash_copy, @args );
 	}
 
 	$clone->{$KEY_MAIN_HASH} = \%hash_copy;
@@ -482,10 +484,10 @@ sub store {
 
 ######################################################################
 
-=head2 store_all( LIST )
+=head2 store_all( SOURCE )
 
-This method takes one argument, LIST, which is an associative list or hash ref or
-HoA object containing new keys and values to store in this object.  The value
+This method takes one argument, SOURCE, which is an associative list or hash ref
+or HoA object containing new keys and values to store in this object.  The value
 associated with each key can be either scalar or an array.  Symantics are the
 same as for calling store() multiple times, once for each KEY. Existing keys and
 values with the same names are replaced.
@@ -757,6 +759,94 @@ sub from_url_encoded_string {
 	}
 
 	return( scalar( @source ) );
+}
+
+######################################################################
+
+=head2 to_file( FH[, DELIM[, VALSEP[, REC_DELIM[, EMPTY]]]]] )
+
+This method encodes all of this object's keys and values using the
+to_url_encoded_string( DELIM, VALSEP ) method and writes it to the filehandle
+provided in FH.  The optional argument REC_DELIM is a scalar value that will be
+written to FH before this encoded object, and serves to delimit multiple encoded
+objects of this class.  The default values for [DELIM, VALSEP, REC_DELIM] are
+["\n", undef, "\n=\n"].  If the boolean argument EMPTY is true then this object
+will be written to FH even if it is empty (has no keys), resulting in only a
+REC_DELIM actually being written.  The default behaviour of false prevents this
+from happening, so only objects containing data are output.  This method returns
+1 on a successful write, 0 for an empty record that was skipped, and it returns
+undef on a file-system error.
+
+=cut
+
+######################################################################
+
+sub to_file {
+	my ($self, $fh, $delim_kvpair, $delim_values, $delim_recs, $use_empty) = @_;
+
+	ref( $fh ) eq 'GLOB' or return( undef );
+
+	$delim_kvpair ||= "\n";
+	$delim_values ||= undef;
+	$delim_recs ||= "\n=\n";
+	
+	local $\ = undef;
+
+	!$self->keys_count() and !$use_empty and return( 0 );
+
+	my $record_str = 
+		$self->to_url_encoded_string( $delim_kvpair, $delim_values );
+
+	print $fh "$delim_recs$record_str" or return( undef );
+	
+	return( 1 );
+}
+
+######################################################################
+
+=head2 from_file( FH[, DELIM[, VALSEP[, REC_DELIM[, EMPTY]]]]] )
+
+This method adds keys and values to this object from an encoded record read from 
+the filehandle provided in FH and parsed with from_url_encoded_string( ., DELIM,
+VALSEP ).  The optional argument REC_DELIM is a scalar value that delimits
+encoded records in the file stream. The default values for [DELIM, VALSEP,
+REC_DELIM] are ["\n", undef, "\n=\n"].  If the boolean argument EMPTY is true
+then this object will be initialized to empty (has no keys) if the record
+delimiter is encountered in the file stream before any valid encoded record.  The
+default behaviour of false prevents this from happening, so the file stream
+continues to be read until a valid record is found.  This method returns 1 on a
+successful read, 0 for an empty record that was kept (may be end-of-file), and it
+returns undef on a file-system error.
+
+=cut
+
+######################################################################
+
+sub from_file {
+	my ($self, $fh, $delim_kvpair, $delim_values, $delim_recs, $use_empty) = @_;
+
+	ref( $fh ) eq 'GLOB' or return( undef );
+
+	$delim_kvpair ||= "\n";
+	$delim_values ||= undef;
+	$delim_recs ||= "\n=\n";
+
+	local $/ = $delim_recs;
+
+	GET_ANOTHER_REC: {
+		eof( $fh ) and return( 0 );
+
+		defined( my $record_str = <$fh> ) or return( undef );
+	
+		$self->from_url_encoded_string( 
+			$record_str, $delim_kvpair, $delim_values );
+	
+		$self->keys_count() and return( 1 );
+	
+		$use_empty and return( 0 );
+	
+		redo GET_ANOTHER_REC;
+	}
 }
 
 ######################################################################

@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA $AUTOLOAD);
-$VERSION = '1.0';
+$VERSION = '1.01';
 
 ######################################################################
 
@@ -374,7 +374,8 @@ positional arguments unless otherwise specified.
 
 =head2 new()
 
-This function creates a new HTML::TagMaker object and returns it.
+This function creates a new HTML::TagMaker object (or subclass thereof) and 
+returns it.
 
 =cut
 
@@ -382,29 +383,51 @@ This function creates a new HTML::TagMaker object and returns it.
 
 sub new {
 	my $class = shift( @_ );
-	my $self = {};
-	bless( $self, ref($class) || $class );
-	$self->{$KEY_AUTO_GROUP} = 0;
-	$self->{$KEY_AUTO_POSIT} = 0;
+	my $self = bless( {}, ref($class) || $class );
+	$self->initialize( @_ );
 	return( $self );
 }
 
 ######################################################################
 
-=head2 clone()
+=head2 initialize()
 
-This method creates a new HTML::TagMaker object, which is a duplicate of
-this one in every respect, and returns it.
+This method is used by B<new()> to set the initial properties of an object,
+that it creates.  All page attributes are wiped clean, resulting in an empty
+page.
+
+=cut
+
+######################################################################
+
+sub initialize {
+	my $self = shift( @_ );
+	$self->{$KEY_AUTO_GROUP} = 0;
+	$self->{$KEY_AUTO_POSIT} = 0;
+}
+
+######################################################################
+
+=head2 clone([ CLONE ])
+
+This method initializes a new object to have all of the same properties of the
+current object and returns it.  This new object can be provided in the optional
+argument CLONE (if CLONE is an object of the same class as the current object);
+otherwise, a brand new object of the current class is used.  Only object 
+properties recognized by HTML::TagMaker are set in the clone; other properties 
+are not changed.
 
 =cut
 
 ######################################################################
 
 sub clone {
-	my $self = shift( @_ );
-	my $clone = {};
-	bless( $clone, ref($self) );
-	%{$clone} = %{$self};  # only does single-level copy
+	my ($self, $clone, @args) = @_;
+	ref($clone) eq ref($self) or $clone = bless( {}, ref($self) );
+	
+	$clone->{$KEY_AUTO_GROUP} = $self->{$KEY_AUTO_GROUP};
+	$clone->{$KEY_AUTO_POSIT} = $self->{$KEY_AUTO_POSIT};
+	
 	return( $clone );
 }
 

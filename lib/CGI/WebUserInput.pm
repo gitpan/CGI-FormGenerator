@@ -19,7 +19,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.9';
+$VERSION = '0.91';
 
 ######################################################################
 
@@ -65,6 +65,7 @@ I<This POD is coming when I get the time to write it.>
 
 	new([ USER_INPUT ])
 	initialize([ USER_INPUT ])
+	clone([ CLONE ]) -- POD for this available below
 
 	user_cookie_str()
 	user_query_str()
@@ -144,52 +145,18 @@ my $UIP_KEYWORDS = '.keywords';  # user input param for ISINDEX queries
 ######################################################################
 
 sub new {
-	my $starter = shift( @_ );  # starter is either object or class
-	my $self = {};
-	bless( $self, ref($starter) || $starter );
-	$self->{$KEY_INITIAL_UI} = ref($starter) ? 
-		$starter->{$KEY_INITIAL_UI} : $self->get_initial_user_input();
+	my $class = shift( @_ );
+	my $self = bless( {}, ref($class) || $class );
 	$self->initialize( @_ );
 	return( $self );
-}
-
-######################################################################
-# This collects user input, and should only be called once by a program
-# for the reason that multiple POST reads from STDIN can cause a hang 
-# if the extra data isn't there.
-
-sub get_initial_user_input {
-	my %iui = ();
-
-	$iui{$IKEY_COOKIE} = $ENV{'HTTP_COOKIE'} || $ENV{'COOKIE'};
-	
-	if( $ENV{'REQUEST_METHOD'} =~ /^(GET|HEAD|POST)$/ ) {
-		$iui{$IKEY_QUERY} = $ENV{'QUERY_STRING'};
-		
-		if( $ENV{'CONTENT_LENGTH'} <= $MAX_CONTENT_LENGTH ) {
-			read( STDIN, $iui{$IKEY_POST}, $ENV{'CONTENT_LENGTH'} );
-			chomp( $iui{$IKEY_POST} );
-		} else {  # post too large, error condition, post not taken
-			$iui{$IKEY_OVERSIZE} = $MAX_CONTENT_LENGTH;
-		}
-
-	} elsif( @ARGV ) {
-		$iui{$IKEY_OFFLINE} = $ARGV[0];
-
-	} else {
-		print STDERR "offline mode: enter query string on standard input\n";
-		print STDERR "it must be query-escaped and all one one line\n";
-		$iui{$IKEY_OFFLINE} = <STDIN>;
-		chomp( $iui{$IKEY_OFFLINE} );
-	}
-
-	return( \%iui );
 }
 
 ######################################################################
 
 sub initialize {
 	my ($self, $user_input) = @_;
+	
+	$self->{$KEY_INITIAL_UI} ||= $self->get_initial_user_input();
 	
 	$self->{$KEY_USER_COOKIE} = $self->parse_url_encoded_cookies( 1, 
 		$self->user_cookie_str() 
@@ -202,6 +169,33 @@ sub initialize {
 	$self->{$KEY_PERSIST_QUERY} = {};
 	
 	$self->user_input( $user_input );
+}
+
+######################################################################
+
+=head2 clone([ CLONE ])
+
+This method initializes a new object to have all of the same properties of the
+current object and returns it.  This new object can be provided in the optional
+argument CLONE (if CLONE is an object of the same class as the current object);
+otherwise, a brand new object of the current class is used.  Only object 
+properties recognized by CGI::WebUserInput are set in the clone; other properties 
+are not changed.
+
+=cut
+
+######################################################################
+
+sub clone {
+	my ($self, $clone, @args) = @_;
+	ref($clone) eq ref($self) or $clone = bless( {}, ref($self) );
+
+	$clone->{$KEY_INITIAL_UI} = $self->{$KEY_INITIAL_UI};  # copy reference
+	$clone->{$KEY_USER_COOKIE} = $self->{$KEY_USER_COOKIE}->clone();
+	$clone->{$KEY_USER_INPUT} = $self->{$KEY_USER_INPUT}->clone();
+	$clone->{$KEY_PERSIST_QUERY} = {%{$self->{$KEY_PERSIST_QUERY}}};
+	
+	return( $clone );
 }
 
 ######################################################################
@@ -364,7 +358,7 @@ sub persistant_user_input_params {
 
 sub persistant_user_input_string {
 	my $self = shift( @_ );
-	return( $self->{$KEY_USER_INPUT}->clone( 
+	return( $self->{$KEY_USER_INPUT}->clone( undef, 
 		[keys %{$self->{$KEY_PERSIST_QUERY}}] 
 		)->to_url_encoded_string() );
 }
@@ -410,6 +404,39 @@ sub parse_url_encoded_queries {
 		}
 	}
 	return( $parsed );
+}
+
+######################################################################
+# This collects user input, and should only be called once by a program
+# for the reason that multiple POST reads from STDIN can cause a hang 
+# if the extra data isn't there.
+
+sub get_initial_user_input {
+	my %iui = ();
+
+	$iui{$IKEY_COOKIE} = $ENV{'HTTP_COOKIE'} || $ENV{'COOKIE'};
+	
+	if( $ENV{'REQUEST_METHOD'} =~ /^(GET|HEAD|POST)$/ ) {
+		$iui{$IKEY_QUERY} = $ENV{'QUERY_STRING'};
+		
+		if( $ENV{'CONTENT_LENGTH'} <= $MAX_CONTENT_LENGTH ) {
+			read( STDIN, $iui{$IKEY_POST}, $ENV{'CONTENT_LENGTH'} );
+			chomp( $iui{$IKEY_POST} );
+		} else {  # post too large, error condition, post not taken
+			$iui{$IKEY_OVERSIZE} = $MAX_CONTENT_LENGTH;
+		}
+
+	} elsif( @ARGV ) {
+		$iui{$IKEY_OFFLINE} = $ARGV[0];
+
+	} else {
+		print STDERR "offline mode: enter query string on standard input\n";
+		print STDERR "it must be query-escaped and all one one line\n";
+		$iui{$IKEY_OFFLINE} = <STDIN>;
+		chomp( $iui{$IKEY_OFFLINE} );
+	}
+
+	return( \%iui );
 }
 
 ######################################################################

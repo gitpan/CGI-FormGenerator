@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '1.0';
+$VERSION = '1.01';
 
 ######################################################################
 
@@ -34,14 +34,14 @@ $VERSION = '1.0';
 
 =head2 Nonstandard Modules
 
-	CGI::HashOfArrays
+	CGI::HashOfArrays 1.02
 
 =cut
 
 ######################################################################
 
 use Fcntl qw(:DEFAULT :flock);
-use CGI::HashOfArrays;
+use CGI::HashOfArrays 1.02;
 
 ######################################################################
 
@@ -188,8 +188,7 @@ do.
 
 sub new {
 	my $class = shift( @_ );
-	my $self = {};
-	bless( $self, ref($class) || $class );
+	my $self = bless( {}, ref($class) || $class );
 	$self->initialize( @_ );
 	return( $self );
 }
@@ -222,22 +221,35 @@ sub initialize {
 
 ######################################################################
 
-=head2 clone()
+=head2 clone([ CLONE ])
 
-This method creates a new CGI::SequentialFile object, which is a duplicate of
-this one in every respect, and returns it.  But the filehandle itself isn't
-duplicated, rather we now might have two references to the same one.  (I'm not
-yet sure when or not this is the case.)
+This method initializes a new object to have all of the same properties of the
+current object and returns it.  This new object can be provided in the optional
+argument CLONE (if CLONE is an object of the same class as the current object);
+otherwise, a brand new object of the current class is used.  Only object 
+properties recognized by CGI::SequentialFile are set in the clone; other 
+properties are not changed.  
+
+Note that the internally stored filehandle (glob ref) is duplicated using an 
+ordinary scalar copy, so I do not know whether the clone points to the same 
+actual filehandle as the original or a different one.
 
 =cut
 
 ######################################################################
 
 sub clone {
-	my $self = shift( @_ );
-	my $clone = {};
-	bless( $clone, ref($self) );
-	%{$clone} = %{$self};  # only does single-level copy
+	my ($self, $clone, @args) = @_;
+	ref($clone) eq ref($self) or $clone = bless( {}, ref($self) );
+
+	$clone->{$KEY_FILEHANDLE} = $self->{$KEY_FILEHANDLE};
+	$clone->{$KEY_FILE_PATH} = $self->{$KEY_FILE_PATH};
+	$clone->{$KEY_CREAT_NNX} = $self->{$KEY_CREAT_NNX};
+	$clone->{$KEY_ACC_PERMS} = $self->{$KEY_ACC_PERMS};
+	$clone->{$KEY_CASE_INSE} = $self->{$KEY_CASE_INSE};
+	$clone->{$KEY_USE_EMPTY} = $self->{$KEY_USE_EMPTY};
+	$clone->{$KEY_IS_ERROR} = $self->{$KEY_IS_ERROR};
+	
 	return( $clone );
 }
 
@@ -520,27 +532,31 @@ sub read_records {
 	my @record_list = ();
 	my $remaining_rec_count = ($max_rec_num <= 0) ? -1 : $max_rec_num;
 
-	local $/ = $DELIM_RECORDS;
-
 	GET_ANOTHER_REC: {
-		eof( $fh ) and return( \@record_list );
-	
-		defined( my $record_str = <$fh> ) or do {
+		eof( $fh ) and last;
+
+		my $record = CGI::HashOfArrays->new( $case_inse );
+
+		defined( $record->from_file( $fh, $DELIM_FIELDS, undef, 
+				$DELIM_RECORDS, $use_empty ) ) or do {
 			$self->_make_filesystem_error( "read record from" );
 			return( undef );
 		};
-	
-		my $record = CGI::HashOfArrays->new( 
-			$case_inse, $record_str, $DELIM_FIELDS );
-		
-		$record->keys_count() or $use_empty or redo GET_ANOTHER_REC;
 
 		push( @record_list, $record );
 
 		--$remaining_rec_count != 0 and redo GET_ANOTHER_REC;
-
-		return( \@record_list );
+	}	
+	
+	# if file is of nonzero length and contains no records, or if it has a 
+	# record separator followed by no records, then we would end up with an 
+	# empty last record in our list even if empty records aren't allowed, 
+	# so we get rid of said disallowed here
+	if( !$use_empty and @record_list and !$record_list[-1]->keys_count() ) {
+		pop( @record_list );
 	}
+	
+	return( \@record_list );
 }
 
 ######################################################################
@@ -570,18 +586,13 @@ sub write_records {
 	
 	$self->{$KEY_IS_ERROR} = undef;
 
-	local $\ = undef;
-
 	foreach my $record (@{$ra_record_list}) {
 		ref( $record ) eq 'HASH' and $record = 
 			CGI::HashOfArrays->new( 0, $record );
 		ref( $record ) eq "CGI::HashOfArrays" or next;
 		
-		!$use_empty and !$record->keys_count() and next;
-
-		my $record_str = $record->to_url_encoded_string( $DELIM_FIELDS );
-
-		print $fh "$DELIM_RECORDS$record_str" or do {
+		defined( $record->to_file( $fh, $DELIM_FIELDS, undef, 
+				$DELIM_RECORDS, $use_empty ) ) or do {
 			$self->_make_filesystem_error( "write record to" );
 			return( undef );
 		};
@@ -760,19 +771,13 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 I have tested this module on Digital UNIX and Linux with no problems.
 
-However, MacPerl seems to have problems with sysread, which manifest themselves
-later as a "bad file descriptor" error when writing to an open file.  Using plain
-"open" seems to fix the problem, but that doesn't give me the flexability to
-create nonexistant files on demand.
+Both Windows 95/98 and Mac OS 7-9 don't implement the flock function, which 
+this module uses automatically during opening and closing.  
 
-Also, the Mac OS currently doesn't implement the flock function, which this
-module uses automatically during opening and closing.  Mac OS X will change this,
-but in the meantime the only ways to use this module on a Mac is to either
-comment out the flock call or just call read_records() and write_records()
-directly while opening and closing the file yourself.
-
-I will note that MacPerl comes with a set of shared libraries that may correct 
-these difficulties, or maybe they don't.  But I never installed them to find out.
+Perl for Mac OS 9 and earlier seems to have problems with sysread, which 
+manifest themselves later as a "bad file descriptor" error when writing to an 
+open file.  Using plain "open" seems to fix the problem, but that doesn't give me 
+the flexability to create nonexistant files on demand.
 
 =head1 SEE ALSO
 

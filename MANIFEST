@@ -1,7 +1,8 @@
-CGI-FormGenerator-0.9:
+CGI-FormGenerator-0.91:
 	ChangeLog
 	lib:
 		CGI:
+			EventCountFile.pm
 			HashOfArrays.pm
 			SequentialFile.pm
 			WebUserInput.pm

@@ -19,7 +19,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.9';
+$VERSION = '0.91';
 
 ######################################################################
 
@@ -179,8 +179,7 @@ page is empty by default.
 
 sub new {
 	my $class = shift( @_ );
-	my $self = {};
-	bless( $self, ref($class) || $class );
+	my $self = bless( {}, ref($class) || $class );
 	$self->initialize( @_ );
 	return( $self );
 }
@@ -219,19 +218,23 @@ sub initialize {
 
 ######################################################################
 
-=head2 clone()
+=head2 clone([ CLONE ])
 
-This method creates a new CGI::WebUserOutput object, which is a duplicate of
-this one in every respect, and returns it.
+This method initializes a new object to have all of the same properties of the
+current object and returns it.  This new object can be provided in the optional
+argument CLONE (if CLONE is an object of the same class as the current object);
+otherwise, a brand new object of the current class is used.  Only object 
+properties recognized by CGI::WebUserOutpu are set in the clone; other properties 
+are not changed.
 
 =cut
 
 ######################################################################
 
 sub clone {
-	my $self = shift( @_ );
-	my $clone = {};
-	bless( $clone, ref($self) );
+	my ($self, $clone, @args) = @_;
+	ref($clone) eq ref($self) or $clone = bless( {}, ref($self) );
+
 	$clone->{$KEY_HTTP_HEADER} = $self->{$KEY_HTTP_HEADER}->clone();
 	$clone->{$KEY_MAIN_BODY} = [@{$self->{$KEY_MAIN_BODY}}];
 	$clone->{$KEY_MAIN_HEAD} = [@{$self->{$KEY_MAIN_HEAD}}];
@@ -243,6 +246,7 @@ sub clone {
 	$clone->{$KEY_BODY_ATTR} = {%{$self->{$KEY_BODY_ATTR}}};
 	$clone->{$KEY_REPLACE} = $self->replacements();  # makes copy
 	$clone->{$KEY_REDIRECT_URL} = $self->{$KEY_REDIRECT_URL};
+
 	return( $clone );
 }
 
@@ -681,7 +685,7 @@ sub to_string {
 
 	if( my $url = $self->{$KEY_REDIRECT_URL} ) {
 		$http->header( 
-			status => '302 Found',
+			status => '301 Moved',  # used to be "302 Found"
 			uri => $url,
 			location => $url,
 			target => 'external_link_window',

@@ -1,3 +1,64 @@
+2000-11-14   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.91.
+	
+	* The module CGI::EventCountFile has been combined into this distribution 
+	rather than being its own distribution, "EventCountFile".  During the move it
+	received updates and went from 1.01 to 1.02; details are below.
+	
+	* All 7 modules in this release are now functionally synchronized in respect 
+	to the methods new(), initialize(), and clone().  Modules that lacked any of 
+	these had them added, and the others received rewrites.  Exceptions are that 
+	HTML::TagMaker and HTML::FormMaker don't have initialize() methods, and the 
+	clone() method in CGI::HashOfArrays can take extra arguments relative to the 
+	others' clone() methods.  Related to these updates, all of the modules 
+	should be easier to subclass than they were before, particular if they are 
+	one of multiple parents.
+	
+	* All modules in this release have had their version numbers incremented by 
+	0.01, and they now read like this:
+		HTML::TagMaker 1.01
+		HTML::FormMaker 1.01
+		CGI::HashOfArrays 1.02
+		CGI::WebUserInput 0.91
+		CGI::WebUserOutput 0.91
+		CGI::SequentialFile 1.01
+		CGI::EventCountFile 1.02
+
+	* Updated HTML::FormMaker to remove a few cases of intimate knowledge it 
+	had of HTML::TagMaker, which is inappropriate to good class design.
+
+	* Added two new methods to CGI::HashOfArrays which allow it to read from or 
+	write to open filehandles.  The new method to_file() will url-encode the 
+	HoA object and write it to the file, whereas from_file() will read an 
+	url-encoded object from a file and add its keys and values to the HoA.  
+	Likewise, new() and initialize() have been updated to accept filehandles.
+
+	* Updated the implementation of CGI::SequentialFile so that it requires the 
+	new functionality of CGI::HashOfArrays; the module's public interface and 
+	behaviour has not changed as a result, however.
+
+	* Updated CGI::WebUserOutput so that when redirect_url() has a value, the 
+	HTTP headers that this module generates have a "status" value of "301 Moved" 
+	instead of "302 Found" as before.  Hopefully, this change should incite more 
+	appropriate behaviour in search engines that index your sites.
+
+	* Updated CGI::WebUserInput to change the way it deals with instances where 
+	you want to make several CGI::WebUserInput objects rather than the usual of 
+	one.  Due to the fact that this class reads POST data from standard input 
+	when making a brand new object, and that this action can only be done once 
+	in the life of the program, and that this class does not employ global 
+	variables, you need to use an existing object when instantiating another so 
+	that this data can be available to both.  In this new version of the class, 
+	you need to use the first object's clone() method to produce the second, 
+	and then optionally call initialize() on the second.  In the old version 
+	there was no clone method and you said "$two = $one->new()" to accomplish 
+	the same thing.  This will no longer work in the newer new(), and in fact 
+	you risk hanging your program to call new() more than once since it would 
+	likely block on a read from standard in that isn't there.  This change to 
+	new() was made because subclasses of CGI::WebUserInput previously would 
+	need intimate knowledge of the class in order to not break the function.
+
 2000-09-04   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.9.
@@ -27,15 +88,20 @@
 		- Class-ParamParser-1.0.tar.gz
 		- libwww-perl-5.48.tar.gz
 
+	* Additionally, on 2000-08-27, the distribution "EventCountFile" was also 
+	spun off of "libdwg" and contained only the module CGI::EventCountFile 1.01.
+	That distribution ceased to exist on 2000-11-14 when CGI::EventCountFile was 
+	moved into the "CGI-FormGenerator 0.91" distribution.
+
 2000-08-23   Darren Duncan <perl@DarrenDuncan.net>
 
 	* libdwg 1.11, the last version of the distribution to include the above 
-	modules, was released.
+	7 modules, was released.
 	
 2000-07-23   Darren Duncan <perl@DarrenDuncan.net>
 
 	* libdwg 1.0, the first version of any distribution to include the above 
-	modules, was released on CPAN.
+	7 modules, was released on CPAN.
 
 2000-05-15   Darren Duncan <perl@DarrenDuncan.net>
 
@@ -54,11 +120,12 @@ non-existant.
 	Most of these modules were meant to replace and extend the functionality 
 	that I previously found in CGI.pm when the latter became inadequate to my 
 	needs, and they are also largely backwards-compatible with it.  The 
-	exception is CGI::SequentialFile which was started previously.
+	exceptions are CGI::SequentialFile, which was started previously, and 
+	CGI::EventCountFile, which was updated from a previous production version.
 
 1999-02 thru 1999-05
 
 	* Created first prototypes of some code that ended up in these modules and 
 	used them to generate my web sites for a year.  The code in question is 
-	mostly relevant to CGI::SequentialFile, and CGI.pm handled most of what 
-	other functionality CGI-FormGenerator now replaces.
+	mostly relevant to CGI::SequentialFile and CGI::EventCountFile,	and CGI.pm 
+	handled most of what other functionality CGI-FormGenerator now replaces.

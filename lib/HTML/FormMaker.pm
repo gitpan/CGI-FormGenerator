@@ -20,7 +20,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA $AUTOLOAD);
-$VERSION = '1.0';
+$VERSION = '1.01';
 
 ######################################################################
 
@@ -38,14 +38,14 @@ $VERSION = '1.0';
 
 	CGI::HashOfArrays
 	Class::ParamParser
-	HTML::TagMaker
+	HTML::TagMaker 1.01
 
 =cut
 
 ######################################################################
 
 use CGI::HashOfArrays;
-use HTML::TagMaker;
+use HTML::TagMaker 1.01;
 @ISA = qw( HTML::TagMaker );
 
 ######################################################################
@@ -250,12 +250,6 @@ my $KEY_INVALID    = 'invalid';   # fields with invalid user input
 my $KEY_FIELD_HTML = 'field_html'; # hash; generated field html
 my $KEY_SUBMIT_URL = 'submit_url';  # where form goes when submitted
 my $KEY_SUBMIT_MET = 'submit_method';  # ususlly POST or GET
-
-# Names of properties for objects of parent class are declared here:
-my $KEY_AUTO_GROUP = 'auto_group';  # do we make tag groups by default?
-my $KEY_AUTO_POSIT = 'auto_posit';  # with methods whose parameters 
-	# could be either named or positional, when we aren't sure what we 
-	# are given, do we guess positional?  Default is named.
 
 # Keys for items in form property $KEY_FIELD_DEFN:
 my $FKEY_TYPE     = 'type';  # form inputs
@@ -798,41 +792,69 @@ This function creates a new HTML::FormMaker object and returns it.
 
 sub new {
 	my $class = shift( @_ );
-	my $self = SUPER::new $class ( @_ );
-	
-	$self->{$KEY_FIELD_DEFN} = [];
-	$self->reset_to_new_form();
-	$self->{$KEY_SUBMIT_URL} = $DEF_SUBMIT_URL;
-	$self->{$KEY_SUBMIT_MET} = $DEF_SUBMIT_MET;
-
+	my $self = bless( {}, ref($class) || $class );
+	$self->initialize( @_ );
 	return( $self );
 }
 
 ######################################################################
 
-=head2 clone()
+=head2 initialize()
 
-This method creates a new HTML::FormMaker object, which is a duplicate of
-this one in every respect, and returns it.
+This method is used by B<new()> to set the initial properties of an object,
+that it creates.
+
+=cut
+
+######################################################################
+
+sub initialize {
+	my $self = shift( @_ );
+
+	$self->SUPER::initialize( @_ );
+
+	$self->{$KEY_FIELD_DEFN} = [];
+	$self->{$KEY_NORMALIZED} = 0;
+	$self->reset_to_new_form();
+	$self->{$KEY_SUBMIT_URL} = $DEF_SUBMIT_URL;
+	$self->{$KEY_SUBMIT_MET} = $DEF_SUBMIT_MET;
+}
+
+######################################################################
+
+=head2 clone([ CLONE ])
+
+This method initializes a new object to have all of the same properties of the
+current object and returns it.  This new object can be provided in the optional
+argument CLONE (if CLONE is an object of the same class as the current object);
+otherwise, a brand new object of the current class is used.  Only object 
+properties recognized by HTML::FormMaker are set in the clone; other properties 
+are not changed.
 
 =cut
 
 ######################################################################
 
 sub clone {
-	my $self = shift( @_ );
-	my $clone = $self->SUPER::clone( @_ );  # single-lev dup everything
+	my ($self, $clone, @args) = @_;
+	ref($clone) eq ref($self) or $clone = bless( {}, ref($self) );
+	$clone = $self->SUPER::clone( $clone );	 # HTML::TagMaker
 
 	$clone->{$KEY_FIELD_DEFN} = 
 		{map {$_->clone()} @{$self->{$KEY_FIELD_DEFN}}};
+	$clone->{$KEY_NORMALIZED} = $self->{$KEY_NORMALIZED};
 
 	$clone->{$KEY_USER_INPUT} = $self->{$KEY_USER_INPUT}->clone();
+	$clone->{$KEY_NEW_FORM} = $self->{$KEY_NEW_FORM};
 	defined( $self->{$KEY_INVALID} ) and 
 		$clone->{$KEY_INVALID} = {%{$self->{$KEY_INVALID}}};
 
 	defined( $self->{$KEY_FIELD_HTML} ) and 
 		$clone->{$KEY_FIELD_HTML} = {%{$self->{$KEY_FIELD_HTML}}};
-
+	
+	$clone->{$KEY_SUBMIT_URL} = $self->{$KEY_SUBMIT_URL};
+	$clone->{$KEY_SUBMIT_MET} = $self->{$KEY_SUBMIT_MET};
+	
 	return( $clone );
 }
 
@@ -1613,7 +1635,7 @@ form_submit_url() and form_submit_method() methods to access these properties.
 sub start_form {
 	my $self = shift( @_ );
 	my $rh_params = $self->params_to_hash( \@_, 
-		$self->{$KEY_AUTO_POSIT}, ['method', 'action'] );
+		$self->positional_by_default(), ['method', 'action'] );
 	$rh_params->{'method'} ||= $self->{$KEY_SUBMIT_MET};
 	$rh_params->{'action'} ||= $self->{$KEY_SUBMIT_URL};
 	return( $self->make_html_tag( 'form', $rh_params, undef, $TAG_START ) );
@@ -1665,7 +1687,7 @@ sub make_input_tag {
 	my $input_name = lc(shift( @_ ));
 	my $ra_params = shift( @_ );
 	my $rh_params = $self->params_to_hash( $ra_params,
-		$self->{$KEY_AUTO_POSIT}, @{$INPUT_MPP_ARGS{$input_name}} );
+		$self->positional_by_default(), @{$INPUT_MPP_ARGS{$input_name}} );
 	my $ra_user_values = shift( @_ );
 	unless( ref( $ra_user_values ) eq 'ARRAY' ) {
 		$ra_user_values = [$ra_user_values];
@@ -1804,7 +1826,7 @@ sub make_input_tag_group {
 	my $input_name = lc(shift( @_ ));
 	my $ra_params = shift( @_ );
 	my $rh_params = $self->params_to_hash( $ra_params,
-		$self->{$KEY_AUTO_POSIT}, @{$INPUT_GROUP_MPP_ARGS{$input_name}} );
+		$self->positional_by_default(), @{$INPUT_GROUP_MPP_ARGS{$input_name}} );
 	my $ra_user_values = shift( @_ );
 	unless( ref( $ra_user_values ) eq 'ARRAY' ) {
 		$ra_user_values = [$ra_user_values];
