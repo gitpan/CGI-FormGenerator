@@ -1,0 +1,33 @@
+                     PREDEFINED FORM GENERATOR
+----------------------------------------------------------------------
+
+by Darren Duncan <perl@DarrenDuncan.net>
+
+This distribution is now dead.  The modules that were in it have evolved and been
+moved into other distributions where they fit better.  Some have new names.  Some
+have split into several modules, and some modules have been absorbed into others.
+
+The only reason that this file and its enclosing distribution exists is to blot
+out as much as possible the details of what this distribution was, due to the
+fact that listings are never deleted from search.cpan.org, but can only be
+covered up by newer versions.  If it is possible to delete distributions from the
+listings, then this document will no longer be necessary.
+
+Please look to the following distributions for the modules you seek.  The details
+shown here are current as of 2001 March 14th.
+
+HTML-EasyTags-1.0301 contains:
+	HTML::EasyTags 1.0301 <= was HTML::TagMaker
+
+MultiValuedHash-1.0501 contains:
+	Data::MultiValuedHash 1.05 <= was part of CGI::HashOfArrays
+	CGI::MultiValuedHash 1.0501 <= was part of CGI::HashOfArrays
+
+HTML-FormTemplate contains:
+	HTML::FormTemplate 1.04 <= was HTML::FormMaker
+
+CGI-WebsiteGenerator-0.33 contains:
+	CGI::WPM::EventCountFile 1.04 <= was CGI::EventCountFile
+	CGI::WPM::SequentialFile 1.03 <= was CGI::SequentialFile
+	CGI::WPM::PageMaker 1.01 <= was HTML::PageMaker
+	CGI::WPM::WebUserIO 0.93 <= was CGI::WebUserIO
