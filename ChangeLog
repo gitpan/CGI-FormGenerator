@@ -1,0 +1,64 @@
+2000-09-04   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.9.
+
+	* This release contains the following modules, which were previously among 
+	the low-level components of my "libdwg" distribution, but I have set these 
+	off on their own for those of you who only want to use them and not the 
+	higher-level components.  There are also mid-level components here:
+		HTML::TagMaker 1.0
+		HTML::FormMaker 1.0
+		CGI::HashOfArrays 1.01
+		CGI::SequentialFile 1.0
+		CGI::WebUserInput 0.9
+		CGI::WebUserOutput 0.9
+
+	* These modules contain complete POD within them, except for 
+	CGI::WebUserInput.  It does have Name, Requirements, Syntax, and lists of 
+	methods and "preferences".  It is lacking Synopsis, Description, and 
+	descriptions for the methods and prefs.
+	
+	* These modules requires Perl version 5.004.
+	
+	* The following distributions are needed by this one.  Some in all 
+	circumstances and some optionally depending on how your web site is 
+	configured.  Only directly-referenced modules are considered.  Other 
+	distributions that these call in turn are not listed:
+		- Class-ParamParser-1.0.tar.gz
+		- libwww-perl-5.48.tar.gz
+
+2000-08-23   Darren Duncan <perl@DarrenDuncan.net>
+
+	* libdwg 1.11, the last version of the distribution to include the above 
+	modules, was released.
+	
+2000-07-23   Darren Duncan <perl@DarrenDuncan.net>
+
+	* libdwg 1.0, the first version of any distribution to include the above 
+	modules, was released on CPAN.
+
+2000-05-15   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Completed primary development on these modules' code, but the POD is mostly
+non-existant.
+
+2000-01-28   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Began development on the final versions of these modules.
+	
+	* All modules based on a template created by h2xs 1.18.
+
+1999-07 thru 1999-12
+
+	* Created and developed most of the code that ended up in these modules.
+	Most of these modules were meant to replace and extend the functionality 
+	that I previously found in CGI.pm when the latter became inadequate to my 
+	needs, and they are also largely backwards-compatible with it.  The 
+	exception is CGI::SequentialFile which was started previously.
+
+1999-02 thru 1999-05
+
+	* Created first prototypes of some code that ended up in these modules and 
+	used them to generate my web sites for a year.  The code in question is 
+	mostly relevant to CGI::SequentialFile, and CGI.pm handled most of what 
+	other functionality CGI-FormGenerator now replaces.

@@ -1,0 +1,250 @@
+                     PREDEFINED FORM GENERATOR
+----------------------------------------------------------------------
+
+by Darren Duncan <perl@DarrenDuncan.net>
+
+SYNOPSIS
+
+	use HTML::FormMaker;
+	use CGI::SequentialFile;
+	use CGI::WebUserInput;
+	use CGI::WebUserOutput;
+	
+	my @questions = (
+		{
+			visible_title => "What's your name?",
+			type => 'textfield',
+			name => 'name',
+			is_required => 1,
+			error_message => 'You must enter your name.',
+			exclude_in_echo => 1,
+		}, {
+			visible_title => "Your E-mail",
+			type => 'textfield',
+			name => 'email',
+			size => 30,
+			is_required => 1,
+			validation_rule => '\S\@\S',
+			help_message => 'E-mails are in the form "user@domain".',
+			error_message => 'You must enter your e-mail.',
+		}, {
+			visible_title => "What's the combination?",
+			type => 'checkbox_group',
+			name => 'words',
+			'values' => ['eenie', 'meenie', 'minie', 'moe'],
+			default => ['eenie', 'minie'],
+		}, {
+			visible_title => "What's your favorite colour?",
+			type => 'popup_menu',
+			name => 'color',
+			'values' => ['red', 'green', 'blue', 'chartreuse'],
+		}, {
+			type => 'submit', 
+		},
+	);
+	
+	my $webpage = CGI::WebUserOutput->new();
+	my $query = CGI::WebUserInput->new();
+	my $message_file = CGI::SequentialFile->new( "GB_Messages.txt", 1 );
+	my $form = HTML::FormMaker->new();
+	
+	$form->form_submit_url( $query->self_url() );
+	$form->field_definitions( \@questions );
+	$form->user_input( $query->user_input() );
+	
+	if( $form->new_form() ) {  # if we're called first time
+		$webpage->title( 'Please sign the guest book' );
+		$webpage->body_content(
+			$form->h1( $webpage->title() ),
+			$form->make_html_input_form( 1 )
+		);
+
+	} elsif( $form->validate_form_input() ) {  #if there were errors
+		$webpage->title( 'Please fix your mistakes' );
+		$webpage->body_content(
+			$form->h1( $webpage->title() ),
+			$form->make_html_input_form( 1 )
+		);
+
+	} else {  # submitted answers are fine
+		$webpage->title( 'Here is what you signed with' );
+		$webpage->body_content(
+			$form->h1( $webpage->title() ),
+			$form->p( 'From: '.$query->user_input_param( 'name' ) ),
+			$form->make_html_input_echo( 1 )
+		);
+	}
+	
+	$message_file->append_new_records( $query->user_input() ) or 
+		$webpage->body_append( '<P>Unfortunately, there was an error in saving'.
+		' your message to the guest book: '.$message_file->is_error()."</P>\n" );
+	
+	$webpage->body_append( 
+		$form->hr(),
+		$form->h1( 'Existing Messages' )
+	);
+	
+	my @message_list = $message_file->fetch_all_records( 1 );
+	
+	if( my $err_msg = $message_file->is_error() ) {
+		$webpage->body_append( '<P>Unfortunately, there was an error reading'.
+		' the messages from the guest book: '.$err_msg."</P>\n" );
+
+	} else {  # show the existing messages
+		my @message_html = ();
+		foreach my $message (reverse @message_list) {
+			$form->user_input( $message );
+			my $name = $message->fetch_value( 'name' );
+			push( @message_html, "<H3>From $name:</H3>" );
+			push( @message_html, 
+				$form->make_html_input_echo( 1, 1, '(no answer)' ) );
+		}
+		$weboage->body_append( \@message_html );
+	}
+	
+	$webpage->send_to_user();
+	
+DESCRIPTION
+
+CGI-FormGenerator is a collection of Perl 5 modules that were developed
+originally to support higher-level modules that implement (generate/compile) an
+unlimited number of unrelated dynamic web-sites at once.  But they can also
+implement most other types of form generation and processing environments, such 
+as e-mail submission forms, guest books, discussion boards, password forms,
+survey forms, voting forms, database connectivity forms, and more.  
+
+One way to look at what these modules can be used for is to look at what the
+popular CGI.pm module is used for.  While I used CGI.pm in the past to perform
+such support roles as detailed above, I soon found that it was inadequate for my
+needs, so I developed these modules to replace and extend the functionality that
+it provided.  I also maintained a large degree of backwards-compatability with
+like-named methods such that it is easy for one accustomed to the older module to
+use these.  Some of you may ask why I would go to this trouble.  But Lincoln
+himself did say that his module had grown monolithic and was trying to handle
+many different tasks by itself.  He recommended discarding CGI.pm in favor of
+smaller and more focused modules.  And so I have done that.  Just in keeping with
+the UNIX philosophy of having many small units that can do their jobs well.
+
+The intent here was to maximize code reuse such that each instance of a web form
+needs very little of its own Perl code to differentiate it from others.  Form 
+questions can be pre-defined and read from a file.  The stored definitions can 
+be in the same format that user input is, meaning that users with their web 
+browsers can use forms created by these modules to make other forms that work 
+with these modules.
+
+To see living examples of these modules in use, check out my web sites at
+"http://www.DarrenDuncan.net" and "http://www.chronology.net".
+
+KEEPING UP TO DATE
+
+These modules are constantly under development.  You should be able to find the
+newest versions at my website, "http://www.DarrenDuncan.net", on the page called
+"Perl Libraries I Made" (name subject to change).  They can also be found on CPAN
+under the author name of "DUNCAND".  
+
+I am inclined to update the copies on my web site more often, but those
+intermediate versions are more likely to have been tested less, and the modules
+may be updated day by day without increasing the version numbers.  However, the
+copies on CPAN are guaranteed to have unique version numbers when the module has
+changed.
+
+REQUIREMENTS
+
+All of my modules require Perl 5.004 or newer, even though only some of them need
+it, in the interest of consistency.
+
+These third-party distributions are required by some of mine.  If they aren't
+included in your Perl distribution then you will need to obtain them from CPAN. 
+The versions below were the newest as of April of 2000.  Some of these are
+optional, so take them as your needs require:
+
+Class-ParamParser-1.0.tar.gz:
+	- by Darren Duncan <perl@DarrenDuncan.net>
+	- Class::ParamParser 1.0 is required by:
+		- HTML::TagMaker
+		- HTML::FormMaker
+		- CGI::WebUserOutput (when assembling a final HTML page only)
+	
+libwww-perl-5.48.tar.gz:
+	- by Gisle Aas <gisle@aas.no>
+	- HTTP::Headers 1.37 is required by:
+		- CGI::WebUserOutput
+	
+Older versions of modules that I didn't make may work as well, but I haven't
+tried using them so do it at your own risk.
+
+INSTALLATION
+
+I haven't gotten around to doing makefiles, so you will have to install these the
+old fashioned way, by copying.  
+
+Any files that you find in "lib" can go in their corresponding locations in the
+"lib" folder that came with your Perl 5 distribution.  Or alternately, put them
+anywhere you want, but you will need to have that location added to your include
+path by your main program using something like this:
+
+	use lib '/users/me/www_files/lib';
+
+Any existing POD is embedded in the modules themselves, so you will have to look
+there to see it, or run a POD extractor on it yourself, or look at the copies on
+CPAN that are dutifully extracted and turned to HTML.
+
+MODULE LIST
+
+Here is a quick list of all the modules in the distribution, and what each is
+for.
+
+HTML::TagMaker - Perl module that can create any HTML tags, as well as groups of
+or just parts of them, and complete html headers or footers.
+
+HTML::FormMaker - Perl module that maintains a predefined html input form
+definition with which it can generate form html, complete with persistant and
+error-checked user input, as well as formatted reports of the user input in html
+or plain text format.
+
+CGI::HashOfArrays - Perl module that implements a hash whose keys can have
+either single or multiple values, and which can process url-encoded data.
+
+CGI::SequentialFile - Perl module that interfaces to a common text file format
+which stores records as named and url-escaped key=value pairs.
+
+CGI::WebUserInput - Perl module that gathers, parses, and manages user input
+data, including query strings, posts, searches, cookies, and shell arguments, 
+as well as providing cleaner access to many environment variables.
+
+CGI::WebUserOutput - Perl module that maintains the components of a new web page,
+including HTTP headers, with which it can assemble and output complete page HTML
+or redirection headers.
+
+HOW TO USE THE MODULES
+
+First of all, it is always a good idea to skim through the POD for any module in
+order to learn how to use it.  Second of all, I don't have any exhaustive 
+tutorials saying how to use these modules.  However, the POD with each one should 
+give you an idea how they work, and in many cases the Synopsis code is a complete 
+program that could be tried out.  For bigger examples of these modules in use, 
+I suggest looking at the CGI-WebsiteGenerator distribution, which uses these 
+extensively.
+
+SUPPORT
+
+Currently I don't have any support arranged with other people, lists, newsgroups,
+or otherwise.  Feel free to ask me if you can't figure things out on your own, or
+another person whom you know has used this.
+
+AUTHOR
+
+Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. These modules are
+free software; you can redistribute them and/or modify them under the same terms
+as Perl itself.  However, I do request that their copyright information remains
+attached to the files.  If you modify this module and redistribute a changed
+version then please attach a note listing the modifications.
+
+I am always interested in knowing how my work helps others, so if you put this
+module to use in any of your own code then please send me the URL.  Also, if you
+make modifications to the module because it doesn't work the way you need, please
+send me a copy so that I can roll desirable changes into the main release.
+
+Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
+
+Share and Enjoy!

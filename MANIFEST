@@ -1,0 +1,14 @@
+CGI-FormGenerator-0.9:
+	ChangeLog
+	lib:
+		CGI:
+			HashOfArrays.pm
+			SequentialFile.pm
+			WebUserInput.pm
+			WebUserOutput.pm
+		HTML:
+			FormMaker.pm
+			TagMaker.pm
+	MANIFEST
+	README
+	ToDo

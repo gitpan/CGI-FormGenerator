@@ -1,0 +1,30 @@
+These are some thoughts on what I need to do still.  Order does not indicate
+priority.
+
+* Write test scripts for everything.  Until then you just have to use them as
+they were intended to see if they work.  In many cases, you could run the
+"Synopsis" programs and compare their output to what I have in the POD.
+
+* Write makefiles for everything.  Meanwhile, you'll have to copy the
+old-fashioned way.
+
+* Fix bug in HTML::FormMaker where providing a Hash ref as a "labels" parameter
+for radio/field groups doesn't work (acts like explicit labels not provided and
+uses values as labels).  In the meantime, using an Array ref for that parameter
+works fine, so I suggest using it instead.
+
+* Make a utility program that utilizes HTML::FormMaker's abilities to let users
+create form definitions for it with a web browser.
+
+* Flesh out POD in HTML::FormMaker so that users don't need to reference CGI.pm
+to know what various field types and their normal parameters are for (they are
+sideways compatible).  The parameters I added are explained, however.
+
+* Complete POD in CGI::WebUserInput; it is missing Synopsis, Description, and
+method descriptions (although their names and params are listed).
+
+* Test cookie-handling abilities of CGI::WebUserInput.
+
+* Explicitely add cookie-storing-handling abilities to CGI::WebUserOutput. 
+Meanwhile, you can use http_header() to get a reference to the internal
+HTTP::Headers object and give it your cookies directly.
